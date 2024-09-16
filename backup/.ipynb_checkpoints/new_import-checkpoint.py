@@ -72,18 +72,9 @@ from datashader import reductions
 from bokeh.models.tickers import FixedTicker
 from rioxarray.merge import merge_arrays
 
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-
 import joblib
 
-def calculate_average(data, time_pattern='1M'):
-    return data.resample(time=time_pattern).mean().persist()
-
-def load_data_sen1(dc, date_range, coordinates):
-    longtitude_range, latitude_range = coordinates
-    print(longtitude_range, latitude_range)
+def load_data_sen1(dc, date_range, longtitude_range, latitude_range):
     data_sen1 = dc.load(
         product="sentinel1_grd_gamma0_20m",
         x=longtitude_range,
@@ -99,14 +90,13 @@ def load_data_sen1(dc, date_range, coordinates):
     
     notebook_utils.heading(notebook_utils.xarray_object_size(data_sen1))
     display(data_sen1)
-    dsvh = data_sen1.vh
-    dsvv = data_sen1.vv
+    
+    dsvv = data_sen1['vv'].resample(time='1M').mean().persist()
+    dsvh = data_sen1['vh'].resample(time='1M').mean().persist()
     
     return dsvh, dsvv
 
-def load_data_sen2(dc, date_range, coordinates):
-    longtitude_range, latitude_range = coordinates
-    print(longtitude_range, latitude_range)
+def load_data_sen2(dc, date_range, longtitude_range, latitude_range):
     product = 's2_l2a'
     query = {
         'product': product,                     # Product name
@@ -131,9 +121,11 @@ def load_data_sen2(dc, date_range, coordinates):
     )
     return data
 
-def mask_cloud(data):
+
+def mask_clean(data):
     flag_name = 'scl'
     flag_desc = masking.describe_variable_flags(data[flag_name])  # Pandas dataframe
+    display(flag_desc)
     display(flag_desc.loc['qa'].values[1])
     # Create a "data quality" Mask layer
     flags_def = flag_desc.loc['qa'].values[1]
@@ -211,8 +203,9 @@ def split_train_data(train, label_mapping, datasets):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def find_best_model(dataset):
-    X_train, X_val, y_train, y_val = dataset
+def train_with_rf(X_train, X_val, y_train, y_val):
+    # Takes 1-2 minutes to complete
+
     # Tạo RandomForestClassifier mặc định để sử dụng làm mô hình ban đầu trong pipeline
     base_model = RandomForestClassifier(random_state=42, n_jobs=-1)
 
