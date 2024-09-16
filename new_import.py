@@ -74,8 +74,29 @@ from rioxarray.merge import merge_arrays
 
 import joblib
 
+def load_data_sen1(dc, date_range, longtitude_range, latitude_range):
+    data_sen1 = dc.load(
+        product="sentinel1_grd_gamma0_20m",
+        x=longtitude_range,
+        y=latitude_range,
+        time=date_range,
+        measurements=["vv", "vh"],
+        output_crs="EPSG:32648",
+        resolution=(-10,10),
+        dask_chunks={"x":2048, "y":2048},
+        skip_broken_datasets=True,
+        group_by='solar_day'
+    )
+    
+    notebook_utils.heading(notebook_utils.xarray_object_size(data_sen1))
+    display(data_sen1)
+    
+    dsvv = data_sen1['vv'].resample(time='1M').mean().persist()
+    dsvh = data_sen1['vh'].resample(time='1M').mean().persist()
+    
+    return dsvh, dsvv
 
-def load_data(dc, date_range, longtitude_range, latitude_range):
+def load_data_sen2(dc, date_range, longtitude_range, latitude_range):
     product = 's2_l2a'
     query = {
         'product': product,                     # Product name
@@ -85,7 +106,7 @@ def load_data(dc, date_range, longtitude_range, latitude_range):
     }
     native_crs = notebook_utils.mostcommon_crs(dc, query)
     print(f'Most common native CRS: {native_crs}')
-    measurements = ['blue', 'green', 'red', 'nir', 'scl']
+    measurements = ['red', 'nir', 'scl']
 
     load_params = {
         'measurements': measurements,                   # Selected measurement or alias names
