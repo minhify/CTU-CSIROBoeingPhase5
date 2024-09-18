@@ -75,6 +75,8 @@ from rioxarray.merge import merge_arrays
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
 import joblib
 
@@ -83,7 +85,6 @@ def calculate_average(data, time_pattern='1M'):
 
 def load_data_sen1(dc, date_range, coordinates):
     longtitude_range, latitude_range = coordinates
-    print(longtitude_range, latitude_range)
     data_sen1 = dc.load(
         product="sentinel1_grd_gamma0_20m",
         x=longtitude_range,
@@ -106,7 +107,6 @@ def load_data_sen1(dc, date_range, coordinates):
 
 def load_data_sen2(dc, date_range, coordinates):
     longtitude_range, latitude_range = coordinates
-    print(longtitude_range, latitude_range)
     product = 's2_l2a'
     query = {
         'product': product,                     # Product name
@@ -116,6 +116,8 @@ def load_data_sen2(dc, date_range, coordinates):
     }
     native_crs = notebook_utils.mostcommon_crs(dc, query)
     print(f'Most common native CRS: {native_crs}')
+    
+    # measurements = ['red','green', 'blue', 'nir', 'scl']
     measurements = ['red', 'nir', 'scl']
 
     load_params = {
@@ -330,9 +332,8 @@ def compare(KD_path, KetQuaPhanLoaiDat, CODE_MAP, HT_MAP):
     return result
 
 
-def save_result(result, HT_MAP):
+def save_result(result, save_path, HT_MAP):
     # cmap = ListedColormap(colors)
-    save_path = "ThuanHoa/KetQua"
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
