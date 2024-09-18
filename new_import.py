@@ -85,7 +85,7 @@ def load_data(dc, date_range, longtitude_range, latitude_range):
     }
     native_crs = notebook_utils.mostcommon_crs(dc, query)
     print(f'Most common native CRS: {native_crs}')
-    measurements = ['blue', 'green', 'red', 'nir', 'scl']
+    measurements = [ 'red', 'nir', 'scl']
 
     load_params = {
         'measurements': measurements,                   # Selected measurement or alias names
