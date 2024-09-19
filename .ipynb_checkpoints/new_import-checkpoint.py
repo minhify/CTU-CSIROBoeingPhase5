@@ -81,6 +81,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import joblib
 
+
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import RepeatedKFold
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+
 def calculate_average(data, time_pattern='1M'):
     return data.resample(time=time_pattern).mean().persist()
 
