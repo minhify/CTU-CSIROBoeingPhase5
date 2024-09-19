@@ -7,6 +7,8 @@ from IPython.display import Markdown
 import pandas as pd
 pd.set_option("display.max_rows", None)
 import xarray as xr
+import geopandas as gpd
+
 
 # Datacube
 import datacube
@@ -43,7 +45,7 @@ import colorcet as cc
 import cartopy.crs as ccrs
 from datashader import reductions
 from holoviews import opts
-from utils import load_data_geo
+# from utils import load_data_geo
 import rasterio
 import rioxarray
 # import geoviews as gv
@@ -77,7 +79,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-
 import joblib
 
 def calculate_average(data, time_pattern='1M'):
@@ -164,9 +165,10 @@ def fill_nan(ndvi, time_split):
     return fill_m
 
 
-def load_train_data(train_path):
-    train = load_data_geo(train_path)
-    return train
+
+def load_data_geo(path: str):
+    gdf = gpd.read_file(path)
+    return gdf
 
 
 def load_sen1(name_vh, name_vv):

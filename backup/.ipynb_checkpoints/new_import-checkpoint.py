@@ -7,7 +7,7 @@ from IPython.display import Markdown
 import pandas as pd
 pd.set_option("display.max_rows", None)
 import xarray as xr
-
+import geopandas as gpd
 # Datacube
 import datacube
 from datacube.utils.rio import configure_s3_access
@@ -154,9 +154,10 @@ def fill_nan(ndvi, time_split):
     return fill_m
 
 
-def load_train_data(train_path):
-    train = load_data_geo(train_path)
-    return train
+
+def load_data_geo(path):
+    gdf = gpd.read_file(path)
+    return gdf
 
 
 def load_sen1(name_vh, name_vv):
