@@ -214,17 +214,36 @@ def split_train_data(train, label_mapping, datasets):
     label_encoder = LabelEncoder()
     # Fit and transform the labels
     labels = train.Hientrang.values
-    numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
+    try:
+        numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
+    except KeyError as e:
+        print(f"Label {e} not found in label_mapping.")
+        return None
     X = []
     x_new = []
     lb_new = []
+    # Lấy dữ liệu từ datasets
     for k, v in datasets.items():
         X.append(v)
+    
+    # Lọc dữ liệu không None và tạo các danh sách x_new và lb_new
     for i in range(len(X)):
         if X[i] is not None:
             x_new.append(X[i]["data"])
             lb_new.append(numeric_labels[i])
-    X_train, X_test, y_train, y_test= train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
+    # Kiểm tra kích thước
+    print(f"data length: {len(x_new)}, label length: {len(lb_new)}")
+    # Kiểm tra xem x_new và lb_new có dữ liệu hay không
+    if len(x_new) == 0 or len(lb_new) == 0:
+        print("Error: No valid data found.")
+        return None
+    # Chuyển đổi thành NumPy arrays
+    x_new = np.array(x_new)
+    lb_new = np.array(lb_new)
+    # Chia dữ liệu
+    X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
+    # In kích thước dữ liệu sau khi chia
+    print(f"X_train length: {len(X_train)}, y_train length: {len(y_train)}")
     return X_train, X_test, y_train, y_test
 
 
@@ -378,20 +397,29 @@ def find_best_regressor(dataset, model_type):
 
 
 ########################################################################
-def cross_validate(train_data, model, num_fold=5):
+def cross_validate(train_data, model, num_fold=5, evaluate_method='accuracy'):
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     validation_scores = []
+    accuracy_scores = []
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
         X_train_fold, X_valid_fold = X_train[train_index], X_train[valid_index]
         y_train_fold, y_valid_fold = y_train[train_index], y_train[valid_index]
+        model.fit(X_train_fold, y_train_fold)
         y_pred = model.predict(X_valid_fold)
+        acc = accuracy_score(y_valid_fold, y_pred)
         score = mean_squared_error(y_valid_fold, y_pred)
         # Store the score
         validation_scores.append(score)
-    print(f"Validation scores over splits: {validation_scores}")
-    print(f"Mean validation score: {sum(validation_scores) / len(validation_scores)}")
+        accuracy_scores.append(acc)
+        
+    if(evaluate_method=='accuracy'):
+        print(f"Validation scores over splits: {validation_scores}")
+        print(f"Accuracy validation score: {sum(validation_scores) / len(validation_scores)}")
+    else:
+        print(f"Validation scores over splits: {validation_scores}")
+        print(f"Mean validation score: {sum(validation_scores) / len(validation_scores)}")
 
 
 #################
