@@ -273,8 +273,8 @@ def find_best_model(dataset, model_type):
         'svm': SVC(random_state=42),
         'naive_bayes': GaussianNB(),
     }
-    if model_type not in regressors:
-        raise ValueError(f"Invalid model_type: {model_type}. Available options are: {list(regressors.keys())}")
+    if model_type not in classifiers:
+        raise ValueError(f"Invalid model_type: {model_type}")
 
     # Select the appropriate classifier based on `model_type`
     classifier = classifiers.get(model_type, RandomForestClassifier(random_state=42, n_jobs=-1))
@@ -315,9 +315,6 @@ def find_best_model(dataset, model_type):
     # Get the best parameters
     best_params = grid_search.best_params_
     print("Best Parameters:", best_params)
-    # Predict on the validation set
-    y_pred = grid_search.predict(X_val)
-    # Evaluate the result
 
     return grid_search
 
