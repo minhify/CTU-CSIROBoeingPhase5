@@ -350,7 +350,7 @@ def find_best_regressor(dataset, model_type):
             'regressor__max_depth': [6, 10, 15],
         },
         'svr': {
-            'regressor__kernel': ['linear', 'poly', 'rbf'],
+            'regressor__kernel': ['poly', 'linear'],
             'regressor__C': [0.1, 1, 10],
             'regressor__degree': [2, 3],  # For poly kernel
         },
