@@ -397,7 +397,7 @@ def find_best_regressor(dataset, model_type):
 
 
 ########################################################################
-def cross_validate(train_data, model, num_fold=5, evaluate_method='accuracy'):
+def cross_validate(train_data, model, num_fold=5, metric='accuracy'):
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     validation_scores = []
@@ -406,17 +406,20 @@ def cross_validate(train_data, model, num_fold=5, evaluate_method='accuracy'):
         # Split into training and validation sets
         X_train_fold, X_valid_fold = X_train[train_index], X_train[valid_index]
         y_train_fold, y_valid_fold = y_train[train_index], y_train[valid_index]
-        model.fit(X_train_fold, y_train_fold)
+        # model.fit(X_train_fold, y_train_fold)
         y_pred = model.predict(X_valid_fold)
-        acc = accuracy_score(y_valid_fold, y_pred)
-        score = mean_squared_error(y_valid_fold, y_pred)
-        # Store the score
-        validation_scores.append(score)
-        accuracy_scores.append(acc)
+        if(metric=='accuracy'):
+            acc = accuracy_score(y_valid_fold, y_pred)
+            accuracy_scores.append(acc)
+        else:
+            score = mean_squared_error(y_valid_fold, y_pred)
+            validation_scores.append(score)
+
         
-    if(evaluate_method=='accuracy'):
-        print(f"Validation scores over splits: {validation_scores}")
-        print(f"Accuracy validation score: {sum(validation_scores) / len(validation_scores)}")
+        
+    if(metric=='accuracy'):
+        print(f"Validation scores over splits: {accuracy_scores}")
+        print(f"Accuracy validation score: {sum(accuracy_scores) / len(accuracy_scores)}")
     else:
         print(f"Validation scores over splits: {validation_scores}")
         print(f"Mean validation score: {sum(validation_scores) / len(validation_scores)}")
