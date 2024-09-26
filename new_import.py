@@ -240,6 +240,8 @@ def split_train_data(train, label_mapping, datasets):
     # Chuyển đổi thành NumPy arrays
     x_new = np.array(x_new)
     lb_new = np.array(lb_new)
+    np.savez('land_use_dataset.npz', data=x_new, label=lb_new)
+    print("SAve dataset")
     # Chia dữ liệu
     X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
     # In kích thước dữ liệu sau khi chia
