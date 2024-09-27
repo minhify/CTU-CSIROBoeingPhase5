@@ -104,7 +104,7 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     best_model = None
-    best_score = -float('inf') if metric == 'accuracy' else float('inf')  # Initialize based on the metric
+    best_score = -float('inf')  # Initialize based on the metric
     best_params = None
     mse_scores = []
     r2_scores = []
