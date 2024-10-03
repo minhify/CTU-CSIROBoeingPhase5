@@ -240,6 +240,8 @@ def split_train_data(train, label_mapping, datasets):
     # Chuyển đổi thành NumPy arrays
     x_new = np.array(x_new)
     lb_new = np.array(lb_new)
+    np.savez('land_use_dataset.npz', data=x_new, label=lb_new)
+    print("SAve dataset")
     # Chia dữ liệu
     X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
     # In kích thước dữ liệu sau khi chia
@@ -247,65 +249,14 @@ def split_train_data(train, label_mapping, datasets):
     return X_train, X_test, y_train, y_test
 
 
-# def find_best_model(dataset):
-#     X_train, X_val, y_train, y_val = dataset
-#     # Tạo RandomForestClassifier mặc định để sử dụng làm mô hình ban đầu trong pipeline
-#     base_model = RandomForestClassifier(random_state=42, n_jobs=-1)
-
-#     # Tạo pipeline
-#     pipeline = Pipeline([
-#         # ('imputer', SimpleImputer(strategy='mean')),
-#         ('scaler', StandardScaler()),
-#         ('classifier', base_model),
-#     ])
-#     # Thiết lập các tham số bạn muốn tối ưu hóa
-#     param_grid = {
-#         'classifier__n_estimators': [100, 300, 500, 700, 1000],
-#         'classifier__max_depth': [6, 8, 10, 15, 20],
-#         'classifier__criterion': ['gini', 'entropy'],
-#     }
-
-#     # Sử dụng GridSearchCV để tìm bộ tham số tốt nhất
-#     grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-#     grid_search.fit(X_train, y_train)
-
-#     # In ra bộ tham số tốt nhất
-#     best_params = grid_search.best_params_
-#     print("Best Parameters:", best_params)
-
-#     # Dự đoán trên tập kiểm tra
-#     y_pred = grid_search.predict(X_val)
-
-#     # Đánh giá kết quả
-#     accuracy = accuracy_score(y_val, y_pred)
-#     print(f"Accuracy: {round(accuracy, 2)*100} %")
-#     return grid_search
-
-#############################################################################t
-def find_best_model(dataset, model_type):
-    X_train, y_train = dataset
-
-    # Dictionary of classifiers
-    classifiers = {
+classifiers = {
         'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
         'knn': KNeighborsClassifier(),
         'svm': SVC(random_state=42),
         'naive_bayes': GaussianNB(),
     }
-    if model_type not in classifiers:
-        raise ValueError(f"Invalid model_type: {model_type}")
 
-    # Select the appropriate classifier based on `model_type`
-    classifier = classifiers.get(model_type, RandomForestClassifier(random_state=42, n_jobs=-1))
-
-    # Create a pipeline
-    pipeline = Pipeline([
-        ('scaler', StandardScaler()),
-        ('classifier', classifier),
-    ])
-
-    # Set up parameter grids for different classifiers
-    param_grids = {
+param_grids_classifier = {
         'random_forest': {
             'classifier__n_estimators': [100, 300, 500],
             'classifier__max_depth': [6, 10, 15],
@@ -323,107 +274,105 @@ def find_best_model(dataset, model_type):
             # No hyperparameters to tune for GaussianNB by default
         },
     }
-    
-    # Get the parameter grid for the chosen classifier
-    param_grid = param_grids.get(model_type, param_grids[model_type])
-    # Use GridSearchCV to find the best parameters
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-    grid_search.fit(X_train, y_train)
-    # Print the classifier name
-    print(f"Using classifier: {classifier.__class__.__name__}")
-    # Get the best parameters
-    best_params = grid_search.best_params_
-    print("Best Parameters:", best_params)
 
-    return grid_search
 
-######################################
-
-def find_best_regressor(dataset, model_type):
-    X_train, y_train = dataset
-    # Dictionary of regressors
-    regressors = {
+regressors = {
         'random_forest': RandomForestRegressor(random_state=42),
         'svr': SVR(),
         'gradient_boosting': GradientBoostingRegressor(random_state=42),
         'linear_regression': LinearRegression(),
         'knn': KNeighborsRegressor(),
     }
-    # Select the appropriate regressor based on `model_type`
-    if model_type not in regressors:
-        raise ValueError(f"Invalid model_type: {model_type}. Available options are: {list(regressors.keys())}")
 
-    regressor = regressors[model_type]
-    # Create a pipeline
-    pipeline = Pipeline([
-        ('scaler', StandardScaler()),
-        ('regressor', regressor),
-    ])
-    # Set up parameter grids for different regressors
-    param_grids = {
-        'random_forest': {
-            'regressor__n_estimators': [100, 300, 500],
-            'regressor__max_depth': [6, 10, 15],
-        },
-        'svr': {
-            'regressor__kernel': ['poly', 'linear'],
-            'regressor__C': [0.1, 1, 10],
-            'regressor__degree': [2, 3],  # For poly kernel
-        },
-        'gradient_boosting': {
-            'regressor__n_estimators': [100, 300],
-            'regressor__learning_rate': [0.01, 0.1, 0.2],
-        },
-        'linear_regression': {
-            # No hyperparameters to tune for LinearRegression
-        },
-        'knn': {
-            'regressor__n_neighbors': [3, 5, 7],
-            'regressor__weights': ['uniform', 'distance'],
-        },
-    }
-    # Fetch the parameter grid for the selected regressor
-    param_grid = param_grids.get(model_type, param_grids['random_forest'])
-
-    # Perform grid search
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, n_jobs=-1, scoring='neg_mean_squared_error')
-    grid_search.fit(X_train, y_train)
-    print(f"Using: {regressor.__class__.__name__}")
-    print (f"Best paras: {grid_search.best_params_}")
-    # Return the best model and its parameters
-    return grid_search
-# Example usage:
-# best_model, best_params = find_best_regressor((X_train, y_train), 'gradient_boosting')
+param_grids_regressor = {
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500],
+        'model__max_depth': [6, 10, 15],
+    },
+    'svr': {
+        'model__kernel': ['poly', 'linear'],
+        'model__C': [0.1, 1, 10],
+        'model__degree': [2, 3],  # For poly kernel
+    },
+    'gradient_boosting': {
+        'model__n_estimators': [100, 300],
+        'model__learning_rate': [0.01, 0.1, 0.2],
+    },
+    'linear_regression': {
+        # No hyperparameters to tune for LinearRegression
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7],
+        'model__weights': ['uniform', 'distance'],
+    },
+}
 
 
 ########################################################################
-def cross_validate(train_data, model, num_fold=5, metric='accuracy'):
+
+def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_mean_squared_error'):
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
-    validation_scores = []
-    accuracy_scores = []
+    best_model = None
+    best_score = -float('inf') 
+    best_params = None
+    mse_scores = []
+    r2_scores = []
+
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
         X_train_fold, X_valid_fold = X_train[train_index], X_train[valid_index]
         y_train_fold, y_valid_fold = y_train[train_index], y_train[valid_index]
-        # model.fit(X_train_fold, y_train_fold)
-        y_pred = model.predict(X_valid_fold)
-        if(metric=='accuracy'):
-            acc = accuracy_score(y_valid_fold, y_pred)
-            accuracy_scores.append(acc)
+        
+        # Initialize a fresh model for each fold (pipeline + grid search)
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('model', model_class)
+        ])
+        
+        # Perform grid search on the training fold
+        grid_search = GridSearchCV(pipeline, param_grid, cv=3, n_jobs=-1, scoring=metric)
+        grid_search.fit(X_train_fold, y_train_fold)
+        
+        # Make predictions on the validation fold
+        y_pred = grid_search.predict(X_valid_fold)
+
+        if metric == 'accuracy':
+            score = accuracy_score(y_valid_fold, y_pred)
         else:
-            score = mean_squared_error(y_valid_fold, y_pred)
-            validation_scores.append(score)
+            # Calculate both R² and MSE for regression tasks
+            r2 = r2_score(y_valid_fold, y_pred)
+            mse = mean_squared_error(y_valid_fold, y_pred)
+            r2_scores.append(r2)
+            mse_scores.append(mse)
 
-        
-        
-    if(metric=='accuracy'):
-        print(f"Validation scores over splits: {accuracy_scores}")
-        print(f"Accuracy validation score: {sum(accuracy_scores) / len(accuracy_scores)}")
+        # Track the best model based on the metric (R² in this case)
+        if metric == 'accuracy':
+            if score > best_score:
+                best_score = score
+                best_model = grid_search.best_estimator_  # Best model for this fold
+                best_params = grid_search.best_params_
+        else:
+            # Track the best model based on R²
+            if r2 > best_score:
+                best_score = r2
+                best_model = grid_search.best_estimator_
+                best_params = grid_search.best_params_
+
+    # Print results
+    if metric == 'accuracy':
+        print(f"Average accuracy: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Best accuracy score: {best_score}")
     else:
-        print(f"Validation scores over splits: {validation_scores}")
-        print(f"Mean validation score: {sum(validation_scores) / len(validation_scores)}")
+        # Print both MSE and R² results
+        print(f"Average R²: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Average MSE: {sum(mse_scores) / len(mse_scores)}")
+        print(f"Best R²: {best_score}")
+    
+    # Return the best model and its parameters
+    return best_model, best_params
 
+# Example of using KNN regressor
 
 #################
 
