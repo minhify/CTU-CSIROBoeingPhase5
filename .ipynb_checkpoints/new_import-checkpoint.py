@@ -7,8 +7,7 @@ from IPython.display import Markdown
 import pandas as pd
 pd.set_option("display.max_rows", None)
 import xarray as xr
-import geopandas as gpd
-
+import joblib
 
 # Datacube
 import datacube
@@ -48,6 +47,11 @@ from holoviews import opts
 # from utils import load_data_geo
 import rasterio
 import rioxarray
+from rasterio.features import shapes
+from shapely.geometry import shape
+from rasterio.enums import Resampling 
+import fiona
+
 # import geoviews as gv
 # from holoviews.operation.datashader import rasterize
 hv.extension('bokeh', logo=False)
@@ -79,7 +83,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-import joblib
+
 
 
 from sklearn.linear_model import LinearRegression
@@ -461,7 +465,6 @@ def compare(KD_path, KetQuaPhanLoaiDat, CODE_MAP, HT_MAP):
         result.update({key: array_list})
     return result
 
-
 def save_result(result, save_path, HT_MAP):
     # cmap = ListedColormap(colors)
     if not os.path.exists(save_path):
@@ -477,3 +480,51 @@ def save_result(result, save_path, HT_MAP):
         # plt.title(f'{HT_MAP[k]["name"]}')
         # plt.axis('off')
         # plt.show()
+
+def tif_to_shp(tif_path, shp_path):
+    with rasterio.open(tif_path) as src:
+        # Đọc dải băng đầu tiên và chuyển đổi kiểu dữ liệu
+        image = src.read(1, resampling=Resampling.bilinear).astype('float32')  # Chuyển đổi sang float32
+        mask = image != src.nodata  # Tạo mặt nạ cho các pixel không phải là no-data
+
+        # Vector hóa ảnh raster (chuyển pixel thành đa giác)
+        results = (
+            {'geometry': shape(s), 'properties': {'raster_val': float(v)}}
+            for s, v in shapes(image, mask=mask, transform=src.transform)
+        )
+
+        # Lưu kết quả vào shapefile
+        schema = {
+            'geometry': 'Polygon',
+            'properties': {'raster_val': 'float'},
+        }
+
+        crs = src.crs.to_wkt() if src.crs else 'EPSG:4326'  # Xác định hệ tọa độ (CRS)
+
+        with fiona.open(shp_path, 'w', driver='ESRI Shapefile', schema=schema, crs=crs) as shp:
+            for result in results:
+                shp.write(result)
+
+    print(f"Saved shapefile to {shp_path}")
+    
+def tif_to_geojson(tif_path, geojson_path):
+    with rasterio.open(tif_path) as src:
+        image = src.read(1)  # Đọc dải băng đầu tiên
+        image = image.astype('float32')  # Chuyển đổi kiểu dữ liệu thành float32
+        mask = image != src.nodata  # Tạo mặt nạ cho các pixel không phải là no-data
+
+        results = (
+            {'geometry': shape(s), 'properties': {'raster_val': float(v)}}
+            for s, v in shapes(image, mask=mask, transform=src.transform)
+        )
+
+        # Tạo GeoDataFrame từ kết quả
+        gdf = gpd.GeoDataFrame.from_records(results)
+
+        # Chỉ định CRS
+        gdf.set_crs(src.crs, inplace=True)
+
+        # Lưu dữ liệu dưới dạng GeoJSON
+        gdf.to_file(geojson_path, driver='GeoJSON')
+        print(f"Saved GeoJSON to {geojson_path}")           
+ 
