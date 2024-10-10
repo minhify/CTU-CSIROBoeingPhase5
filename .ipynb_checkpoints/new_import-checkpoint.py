@@ -102,7 +102,7 @@ def calculate_average(data, time_pattern='1M'):
 def load_data_sen1(dc, date_range, coordinates):
     longtitude_range, latitude_range = coordinates
     data_sen1 = dc.load(
-        product="sentinel1_grd_gamma0_20m",
+        product="sentinel1_grd_gamma0_10m",
         x=longtitude_range,
         y=latitude_range,
         time=date_range,
@@ -318,6 +318,7 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     best_params = None
     mse_scores = []
     r2_scores = []
+    acc_score = []
 
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
@@ -339,29 +340,27 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
         if metric == 'accuracy':
             score = accuracy_score(y_valid_fold, y_pred)
+            acc_scores.append(score)
+            if score > best_score:
+                best_score = score
+                best_model = grid_search.best_estimator_  # Best model for this fold
+                best_params = grid_search.best_params_
+            
         else:
             # Calculate both R² and MSE for regression tasks
             r2 = r2_score(y_valid_fold, y_pred)
             mse = mean_squared_error(y_valid_fold, y_pred)
             r2_scores.append(r2)
             mse_scores.append(mse)
-
-        # Track the best model based on the metric (R² in this case)
-        if metric == 'accuracy':
-            if score > best_score:
-                best_score = score
-                best_model = grid_search.best_estimator_  # Best model for this fold
-                best_params = grid_search.best_params_
-        else:
-            # Track the best model based on R²
             if r2 > best_score:
                 best_score = r2
                 best_model = grid_search.best_estimator_
                 best_params = grid_search.best_params_
 
+
     # Print results
     if metric == 'accuracy':
-        print(f"Average accuracy: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Average accuracy: {sum(acc_scrores) / len(acc_scroresdaj)}")
         print(f"Best accuracy score: {best_score}")
     else:
         # Print both MSE and R² results
