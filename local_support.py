@@ -161,5 +161,5 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     # Return the best model and its parameters
     return best_model, best_params
 
-# Example of using KNN regressor
+#####################################################
 

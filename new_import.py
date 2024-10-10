@@ -102,7 +102,7 @@ def calculate_average(data, time_pattern='1M'):
 def load_data_sen1(dc, date_range, coordinates):
     longtitude_range, latitude_range = coordinates
     data_sen1 = dc.load(
-        product="sentinel1_grd_gamma0_10m",
+        product="sentinel1_grd_gamma0_20m",
         x=longtitude_range,
         y=latitude_range,
         time=date_range,
