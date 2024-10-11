@@ -130,12 +130,8 @@ def load_data_sen2(dc, date_range, coordinates):
         'y': latitude_range,      # "y" axis bounds
         'time': date_range,           # Any parsable date strings
     }
-    native_crs = notebook_utils.mostcommon_crs(dc, query)
-    print(f'Most common native CRS: {native_crs}')
-    
-    # measurements = ['red','green', 'blue', 'nir', 'scl']
+    native_crs = "EPSG:32648"
     measurements = ['red', 'nir', 'scl']
-
     load_params = {
         'measurements': measurements,                   # Selected measurement or alias names
         'output_crs': native_crs,                       # Target EPSG code
