@@ -197,7 +197,7 @@ def create_dataset(train, average_ndvi, dsvh, dsvv):
             vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             loaded_datasets[key] = {
-                "data": np.concatenate((ndvi_data, vh_data, vv_data)),
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
                 "label": point.HT_code
                                    }
         except Exception as e:
@@ -253,23 +253,24 @@ classifiers = {
     }
 
 param_grids_classifier = {
-        'random_forest': {
-            'classifier__n_estimators': [100, 300, 500],
-            'classifier__max_depth': [6, 10, 15],
-            'classifier__criterion': ['gini', 'entropy'],
-        },
-        'knn': {
-            'classifier__n_neighbors': [3, 5, 7],
-            'classifier__weights': ['uniform', 'distance'],
-        },
-        'svm': {
-            'classifier__C': [0.1, 1, 10],
-            'classifier__kernel': ['linear', 'rbf'],
-        },
-        'naive_bayes': {
-            # No hyperparameters to tune for GaussianNB by default
-        },
-    }
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500],
+        'model__max_depth': [6, 10, 15],
+        'model__criterion': ['gini', 'entropy'],
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7],
+        'model__weights': ['uniform', 'distance'],
+    },
+    'svm': {
+        'model__C': [0.1, 1, 10],
+        'model__kernel': ['linear', 'rbf'],
+    },
+    'naive_bayes': {
+        # No hyperparameters to tune for GaussianNB by default
+    },
+}
+
 
 
 regressors = {
@@ -310,11 +311,11 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     best_model = None
-    best_score = -float('inf') 
+    best_score = -float('inf') if metric != 'accuracy' else 0 
     best_params = None
     mse_scores = []
     r2_scores = []
-    acc_score = []
+    acc_scores = []
 
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
@@ -356,7 +357,7 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
     # Print results
     if metric == 'accuracy':
-        print(f"Average accuracy: {sum(acc_scrores) / len(acc_scroresdaj)}")
+        print(f"Average accuracy: {sum(acc_scores) / len(acc_scores)}")
         print(f"Best accuracy score: {best_score}")
     else:
         # Print both MSE and R² results
@@ -369,7 +370,35 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
 # Example of using KNN regressor
 
-#################
+#############################################################
+def extract_data_point(train, average_ndvi, dsvh, dsvv):
+    loaded_datasets = {}
+    for idx, point in train.iterrows():
+        key = f"point_{idx + 1}"
+        try:
+            ndvi_data = average_ndvi.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            loaded_datasets[key] = {
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
+                "label": point.HT_code
+            }
+        except Exception as e:
+            # Handle the exception if necessary
+            print(f"Error at point {key}: {e}")
+    return loaded_datasets
+#############################################################
+def create_dataset(datasets):
+    data_points = []
+    labels = []
+    for point_key, point_data in datasets.items():
+        data_array = point_data['data']
+        label = point_data['label']
+        for row in data_array:
+            data_points.append(row)
+            labels.append(label)
+    return data_points, labels
+
 
 
 
