@@ -1,2 +1,4 @@
 model_train/
 datasets/ndvi_vh_vv.npz 
+datasets/filled_cloud
+datasets/ndvi_vh_vv_raw_data.npz

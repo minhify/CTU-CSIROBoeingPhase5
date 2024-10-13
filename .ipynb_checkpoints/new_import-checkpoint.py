@@ -7,7 +7,8 @@ from IPython.display import Markdown
 import pandas as pd
 pd.set_option("display.max_rows", None)
 import xarray as xr
-import joblib
+import geopandas as gpd
+
 
 # Datacube
 import datacube
@@ -47,11 +48,6 @@ from holoviews import opts
 # from utils import load_data_geo
 import rasterio
 import rioxarray
-from rasterio.features import shapes
-from shapely.geometry import shape
-from rasterio.enums import Resampling 
-import fiona
-
 # import geoviews as gv
 # from holoviews.operation.datashader import rasterize
 hv.extension('bokeh', logo=False)
@@ -83,7 +79,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-
+import joblib
 
 
 from sklearn.linear_model import LinearRegression
@@ -134,12 +130,8 @@ def load_data_sen2(dc, date_range, coordinates):
         'y': latitude_range,      # "y" axis bounds
         'time': date_range,           # Any parsable date strings
     }
-    native_crs = notebook_utils.mostcommon_crs(dc, query)
-    print(f'Most common native CRS: {native_crs}')
-    
-    # measurements = ['red','green', 'blue', 'nir', 'scl']
+    native_crs = "EPSG:32648"
     measurements = ['red', 'nir', 'scl']
-
     load_params = {
         'measurements': measurements,                   # Selected measurement or alias names
         'output_crs': native_crs,                       # Target EPSG code
@@ -205,7 +197,7 @@ def create_dataset(train, average_ndvi, dsvh, dsvv):
             vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             loaded_datasets[key] = {
-                "data": np.concatenate((ndvi_data, vh_data, vv_data)),
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
                 "label": point.HT_code
                                    }
         except Exception as e:
@@ -261,23 +253,24 @@ classifiers = {
     }
 
 param_grids_classifier = {
-        'random_forest': {
-            'classifier__n_estimators': [100, 300, 500],
-            'classifier__max_depth': [6, 10, 15],
-            'classifier__criterion': ['gini', 'entropy'],
-        },
-        'knn': {
-            'classifier__n_neighbors': [3, 5, 7],
-            'classifier__weights': ['uniform', 'distance'],
-        },
-        'svm': {
-            'classifier__C': [0.1, 1, 10],
-            'classifier__kernel': ['linear', 'rbf'],
-        },
-        'naive_bayes': {
-            # No hyperparameters to tune for GaussianNB by default
-        },
-    }
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500],
+        'model__max_depth': [6, 10, 15],
+        'model__criterion': ['gini', 'entropy'],
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7],
+        'model__weights': ['uniform', 'distance'],
+    },
+    'svm': {
+        'model__C': [0.1, 1, 10],
+        'model__kernel': ['linear', 'rbf'],
+    },
+    'naive_bayes': {
+        # No hyperparameters to tune for GaussianNB by default
+    },
+}
+
 
 
 regressors = {
@@ -318,10 +311,11 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     best_model = None
-    best_score = -float('inf') 
+    best_score = -float('inf') if metric != 'accuracy' else 0 
     best_params = None
     mse_scores = []
     r2_scores = []
+    acc_scores = []
 
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
@@ -343,29 +337,27 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
         if metric == 'accuracy':
             score = accuracy_score(y_valid_fold, y_pred)
+            acc_scores.append(score)
+            if score > best_score:
+                best_score = score
+                best_model = grid_search.best_estimator_  # Best model for this fold
+                best_params = grid_search.best_params_
+            
         else:
             # Calculate both R² and MSE for regression tasks
             r2 = r2_score(y_valid_fold, y_pred)
             mse = mean_squared_error(y_valid_fold, y_pred)
             r2_scores.append(r2)
             mse_scores.append(mse)
-
-        # Track the best model based on the metric (R² in this case)
-        if metric == 'accuracy':
-            if score > best_score:
-                best_score = score
-                best_model = grid_search.best_estimator_  # Best model for this fold
-                best_params = grid_search.best_params_
-        else:
-            # Track the best model based on R²
             if r2 > best_score:
                 best_score = r2
                 best_model = grid_search.best_estimator_
                 best_params = grid_search.best_params_
 
+
     # Print results
     if metric == 'accuracy':
-        print(f"Average accuracy: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Average accuracy: {sum(acc_scores) / len(acc_scores)}")
         print(f"Best accuracy score: {best_score}")
     else:
         # Print both MSE and R² results
@@ -378,9 +370,34 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
 # Example of using KNN regressor
 
-#################
-
-
+#############################################################
+def extract_data_point(train, average_ndvi, dsvh, dsvv):
+    loaded_datasets = {}
+    for idx, point in train.iterrows():
+        key = f"point_{idx + 1}"
+        try:
+            ndvi_data = average_ndvi.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            loaded_datasets[key] = {
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
+                "label": point.HT_code
+            }
+        except Exception as e:
+            # Handle the exception if necessary
+            print(f"Error at point {key}: {e}")
+    return loaded_datasets
+#############################################################
+def create_dataset(datasets):
+    data_points = []
+    labels = []
+    for point_key, point_data in datasets.items():
+        data_array = point_data['data']
+        label = point_data['label']
+        for row in data_array:
+            data_points.append(row)
+            labels.append(label)
+    return data_points, labels
 
 def save_model(name_file, grid_search):
     dir_save_model = "model_train"
@@ -465,6 +482,7 @@ def compare(KD_path, KetQuaPhanLoaiDat, CODE_MAP, HT_MAP):
         result.update({key: array_list})
     return result
 
+
 def save_result(result, save_path, HT_MAP):
     # cmap = ListedColormap(colors)
     if not os.path.exists(save_path):
@@ -480,7 +498,7 @@ def save_result(result, save_path, HT_MAP):
         # plt.title(f'{HT_MAP[k]["name"]}')
         # plt.axis('off')
         # plt.show()
-
+        
 def tif_to_shp(tif_path, shp_path):
     with rasterio.open(tif_path) as src:
         # Đọc dải băng đầu tiên và chuyển đổi kiểu dữ liệu
