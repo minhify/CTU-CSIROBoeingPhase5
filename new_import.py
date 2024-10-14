@@ -93,7 +93,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
-
+from sklearn.ensemble import GradientBoostingClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
 
 
 def calculate_average(data, time_pattern='1M'):
@@ -246,12 +248,16 @@ def split_train_data(train, label_mapping, datasets):
 
 
 classifiers = {
-        'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
-        'knn': KNeighborsClassifier(),
-        'svm': SVC(random_state=42),
-        'naive_bayes': GaussianNB(),
-    }
+    'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
+    'knn': KNeighborsClassifier(),
+    'svm': SVC(random_state=42),
+    'naive_bayes': GaussianNB(),
+    'gradient_boosting': GradientBoostingClassifier(random_state=42),
+    'xgboost': XGBClassifier(random_state=42, use_label_encoder=False),
+    'lightgbm': LGBMClassifier(random_state=42)
+}
 
+# Cập nhật lưới tham số cho GridSearchCV hoặc RandomizedSearchCV
 param_grids_classifier = {
     'random_forest': {
         'model__n_estimators': [100, 300, 500],
@@ -267,11 +273,28 @@ param_grids_classifier = {
         'model__kernel': ['linear', 'rbf'],
     },
     'naive_bayes': {
-        # No hyperparameters to tune for GaussianNB by default
+        # GaussianNB không có tham số để tinh chỉnh
     },
+    'gradient_boosting': {
+        'model__n_estimators': [100, 200, 300],
+        'model__learning_rate': [0.01, 0.1, 0.2],
+        'model__max_depth': [3, 5, 7],
+    },
+    'xgboost': {
+        'model__n_estimators': [100, 200, 300],
+        'model__learning_rate': [0.01, 0.1, 0.2],
+        'model__max_depth': [3, 5, 7],
+        'model__subsample': [0.6, 0.8, 1.0],
+        'model__colsample_bytree': [0.6, 0.8, 1.0],
+    },
+    'lightgbm': {
+        'model__n_estimators': [100, 200, 300],
+        'model__learning_rate': [0.01, 0.1, 0.2],
+        'model__max_depth': [-1, 3, 5, 7],  # -1 là mặc định, không giới hạn độ sâu
+        'model__num_leaves': [31, 50, 100],
+        'model__subsample': [0.6, 0.8, 1.0],
+    }
 }
-
-
 
 regressors = {
         'random_forest': RandomForestRegressor(random_state=42),
@@ -501,3 +524,5 @@ def save_result(result, save_path, HT_MAP):
         # plt.title(f'{HT_MAP[k]["name"]}')
         # plt.axis('off')
         # plt.show()
+#################################################       
+        
