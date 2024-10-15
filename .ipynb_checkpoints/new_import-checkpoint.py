@@ -298,7 +298,7 @@ param_grids_regressor = {
         # No hyperparameters to tune for LinearRegression
     },
     'knn': {
-        'model__n_neighbors': [3, 5, 7],
+        'model__n_neighbors': [3, 5, 7, 10 , 20 , 30],
         'model__weights': ['uniform', 'distance'],
     },
 }

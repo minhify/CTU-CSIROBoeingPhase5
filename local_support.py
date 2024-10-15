@@ -39,31 +39,32 @@ from sklearn.metrics import accuracy_score
 
 
 classifiers = {
-        'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
-        'knn': KNeighborsClassifier(),
-        'svm': SVC(random_state=42),
-        'naive_bayes': GaussianNB(),
-    }
+    'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
+    'knn': KNeighborsClassifier(),
+    'svm': SVC(random_state=42),
+    'naive_bayes': GaussianNB()
+}
 
+# Cập nhật lưới tham số cho GridSearchCV hoặc RandomizedSearchCV
 param_grids_classifier = {
-        'random_forest': {
-            'classifier__n_estimators': [100, 300, 500],
-            'classifier__max_depth': [6, 10, 15],
-            'classifier__criterion': ['gini', 'entropy'],
-        },
-        'knn': {
-            'classifier__n_neighbors': [3, 5, 7],
-            'classifier__weights': ['uniform', 'distance'],
-        },
-        'svm': {
-            'classifier__C': [0.1, 1, 10],
-            'classifier__kernel': ['linear', 'rbf'],
-        },
-        'naive_bayes': {
-            # No hyperparameters to tune for GaussianNB by default
-        },
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500],
+        'model__max_depth': [6, 10, 15],
+        'model__criterion': ['gini', 'entropy'],
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7],
+        'model__weights': ['uniform', 'distance'],
+    },
+    'svm': {
+        'model__C': [0.1, 1, 10],
+        'model__kernel': ['linear', 'rbf'],
+    },
+    'naive_bayes': {
+        # GaussianNB không có tham số để tinh chỉnh
     }
 
+}
 
 regressors = {
         'random_forest': RandomForestRegressor(random_state=42),
@@ -91,7 +92,7 @@ param_grids_regressor = {
         # No hyperparameters to tune for LinearRegression
     },
     'knn': {
-        'model__n_neighbors': [3, 5, 7],
+        'model__n_neighbors': [3, 5, 7, 10 , 20 , 30],
         'model__weights': ['uniform', 'distance'],
     },
 }
@@ -103,10 +104,11 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     X_train, y_train = train_data
     rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
     best_model = None
-    best_score = -float('inf')  # Initialize based on the metric
+    best_score = -float('inf') if metric != 'accuracy' else 0 
     best_params = None
     mse_scores = []
     r2_scores = []
+    acc_scores = []
 
     for train_index, valid_index in rkf.split(X_train):
         # Split into training and validation sets
@@ -128,29 +130,27 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
 
         if metric == 'accuracy':
             score = accuracy_score(y_valid_fold, y_pred)
+            acc_scores.append(score)
+            if score > best_score:
+                best_score = score
+                best_model = grid_search.best_estimator_  # Best model for this fold
+                best_params = grid_search.best_params_
+            
         else:
             # Calculate both R² and MSE for regression tasks
             r2 = r2_score(y_valid_fold, y_pred)
             mse = mean_squared_error(y_valid_fold, y_pred)
             r2_scores.append(r2)
             mse_scores.append(mse)
-
-        # Track the best model based on the metric (R² in this case)
-        if metric == 'accuracy':
-            if score > best_score:
-                best_score = score
-                best_model = grid_search.best_estimator_  # Best model for this fold
-                best_params = grid_search.best_params_
-        else:
-            # Track the best model based on R²
             if r2 > best_score:
                 best_score = r2
                 best_model = grid_search.best_estimator_
                 best_params = grid_search.best_params_
 
+
     # Print results
     if metric == 'accuracy':
-        print(f"Average accuracy: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Average accuracy: {sum(acc_scores) / len(acc_scores)}")
         print(f"Best accuracy score: {best_score}")
     else:
         # Print both MSE and R² results
@@ -161,5 +161,5 @@ def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_
     # Return the best model and its parameters
     return best_model, best_params
 
-#####################################################
+# Example of using KNN regressor
 
