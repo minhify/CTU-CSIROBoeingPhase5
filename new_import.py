@@ -101,7 +101,7 @@ def calculate_average(data, time_pattern='1M'):
 def load_data_sen1(dc, date_range, coordinates):
     longtitude_range, latitude_range = coordinates
     data_sen1 = dc.load(
-        product="sentinel1_grd_gamma0_20m",
+        product="sentinel1_grd_gamma0_10m",
         x=longtitude_range,
         y=latitude_range,
         time=date_range,
@@ -282,7 +282,7 @@ regressors = {
 
 param_grids_regressor = {
     'random_forest': {
-        'model__n_estimators': [100, 300, 500],
+        'model__n_estimators': [100, 300, 500, 1000],
         'model__max_depth': [6, 10, 15],
     },
     'svr': {
@@ -291,8 +291,8 @@ param_grids_regressor = {
         'model__degree': [2, 3],  # For poly kernel
     },
     'gradient_boosting': {
-        'model__n_estimators': [100, 300],
-        'model__learning_rate': [0.01, 0.1, 0.2],
+        'model__n_estimators': [100, 300, 500],
+        'model__learning_rate': [0.001, 0.01, 0.05, 0.1, 0.2],  # Extended range
     },
     'linear_regression': {
         # No hyperparameters to tune for LinearRegression
@@ -300,6 +300,7 @@ param_grids_regressor = {
     'knn': {
         'model__n_neighbors': [3, 5, 7, 10 , 20 , 30],
         'model__weights': ['uniform', 'distance'],
+        'model__p': [1, 2],
     },
 }
 
