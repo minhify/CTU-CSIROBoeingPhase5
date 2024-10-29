@@ -8,6 +8,8 @@ import pandas as pd
 pd.set_option("display.max_rows", None)
 import xarray as xr
 import geopandas as gpd
+
+
 # Datacube
 import datacube
 from datacube.utils.rio import configure_s3_access
@@ -43,7 +45,7 @@ import colorcet as cc
 import cartopy.crs as ccrs
 from datashader import reductions
 from holoviews import opts
-from utils import load_data_geo
+# from utils import load_data_geo
 import rasterio
 import rioxarray
 # import geoviews as gv
@@ -72,11 +74,34 @@ from datashader import reductions
 from bokeh.models.tickers import FixedTicker
 from rioxarray.merge import merge_arrays
 
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 import joblib
 
-def load_data_sen1(dc, date_range, longtitude_range, latitude_range):
+
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import RepeatedKFold
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+###
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+
+
+def calculate_average(data, time_pattern='1M'):
+    return data.resample(time=time_pattern).mean().persist()
+
+def load_data_sen1(dc, date_range, coordinates):
+    longtitude_range, latitude_range = coordinates
     data_sen1 = dc.load(
-        product="sentinel1_grd_gamma0_20m",
+        product="sentinel1_grd_gamma0_10m",
         x=longtitude_range,
         y=latitude_range,
         time=date_range,
@@ -90,13 +115,13 @@ def load_data_sen1(dc, date_range, longtitude_range, latitude_range):
     
     notebook_utils.heading(notebook_utils.xarray_object_size(data_sen1))
     display(data_sen1)
-    
-    dsvv = data_sen1['vv'].resample(time='1M').mean().persist()
-    dsvh = data_sen1['vh'].resample(time='1M').mean().persist()
+    dsvh = data_sen1.vh
+    dsvv = data_sen1.vv
     
     return dsvh, dsvv
 
-def load_data_sen2(dc, date_range, longtitude_range, latitude_range):
+def load_data_sen2(dc, date_range, coordinates):
+    longtitude_range, latitude_range = coordinates
     product = 's2_l2a'
     query = {
         'product': product,                     # Product name
@@ -104,10 +129,8 @@ def load_data_sen2(dc, date_range, longtitude_range, latitude_range):
         'y': latitude_range,      # "y" axis bounds
         'time': date_range,           # Any parsable date strings
     }
-    native_crs = notebook_utils.mostcommon_crs(dc, query)
-    print(f'Most common native CRS: {native_crs}')
+    native_crs = "EPSG:32648"
     measurements = ['red', 'nir', 'scl']
-
     load_params = {
         'measurements': measurements,                   # Selected measurement or alias names
         'output_crs': native_crs,                       # Target EPSG code
@@ -121,11 +144,9 @@ def load_data_sen2(dc, date_range, longtitude_range, latitude_range):
     )
     return data
 
-
-def mask_clean(data):
+def mask_cloud(data):
     flag_name = 'scl'
     flag_desc = masking.describe_variable_flags(data[flag_name])  # Pandas dataframe
-    display(flag_desc)
     display(flag_desc.loc['qa'].values[1])
     # Create a "data quality" Mask layer
     flags_def = flag_desc.loc['qa'].values[1]
@@ -155,7 +176,7 @@ def fill_nan(ndvi, time_split):
 
 
 
-def load_data_geo(path):
+def load_data_geo(path: str):
     gdf = gpd.read_file(path)
     return gdf
 
@@ -166,7 +187,7 @@ def load_sen1(name_vh, name_vv):
     return dsvh, dsvv
 
 
-def get_data_sen1_and_sen2(train, average_ndvi, dsvh, dsvv):
+def create_dataset(train, average_ndvi, dsvh, dsvv):
     loaded_datasets = {}
     for idx, point in train.iterrows():
         key = f"point_{idx + 1}"
@@ -175,7 +196,7 @@ def get_data_sen1_and_sen2(train, average_ndvi, dsvh, dsvv):
             vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
             loaded_datasets[key] = {
-                "data": np.concatenate((ndvi_data, vh_data, vv_data)),
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
                 "label": point.HT_code
                                    }
         except Exception as e:
@@ -186,58 +207,199 @@ def get_data_sen1_and_sen2(train, average_ndvi, dsvh, dsvv):
 
 def split_train_data(train, label_mapping, datasets):
     label_encoder = LabelEncoder()
-
     # Fit and transform the labels
     labels = train.Hientrang.values
-    numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
+    try:
+        numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
+    except KeyError as e:
+        print(f"Label {e} not found in label_mapping.")
+        return None
     X = []
     x_new = []
     lb_new = []
+    # Lấy dữ liệu từ datasets
     for k, v in datasets.items():
         X.append(v)
+    
+    # Lọc dữ liệu không None và tạo các danh sách x_new và lb_new
     for i in range(len(X)):
         if X[i] is not None:
             x_new.append(X[i]["data"])
             lb_new.append(numeric_labels[i])
-    X_train, X_temp, y_train, y_temp= train_test_split(x_new, lb_new, test_size=0.4, random_state=42)
-    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    # Kiểm tra kích thước
+    print(f"data length: {len(x_new)}, label length: {len(lb_new)}")
+    # Kiểm tra xem x_new và lb_new có dữ liệu hay không
+    if len(x_new) == 0 or len(lb_new) == 0:
+        print("Error: No valid data found.")
+        return None
+    # Chuyển đổi thành NumPy arrays
+    x_new = np.array(x_new)
+    lb_new = np.array(lb_new)
+    np.savez('land_use_dataset.npz', data=x_new, label=lb_new)
+    print("SAve dataset")
+    # Chia dữ liệu
+    X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
+    # In kích thước dữ liệu sau khi chia
+    print(f"X_train length: {len(X_train)}, y_train length: {len(y_train)}")
+    return X_train, X_test, y_train, y_test
 
 
-def train_with_rf(X_train, X_val, y_train, y_val):
-    # Takes 1-2 minutes to complete
+classifiers = {
+    'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
+    'knn': KNeighborsClassifier(),
+    'svm': SVC(random_state=42),
+    'naive_bayes': GaussianNB()
+}
 
-    # Tạo RandomForestClassifier mặc định để sử dụng làm mô hình ban đầu trong pipeline
-    base_model = RandomForestClassifier(random_state=42, n_jobs=-1)
-
-    # Tạo pipeline
-    pipeline = Pipeline([
-        # ('imputer', SimpleImputer(strategy='mean')),
-        ('scaler', StandardScaler()),
-        ('classifier', base_model),
-    ])
-    # Thiết lập các tham số bạn muốn tối ưu hóa
-    param_grid = {
-        'classifier__n_estimators': [100, 300, 500, 700, 1000],
-        'classifier__max_depth': [6, 8, 10, 15, 20],
-        'classifier__criterion': ['gini', 'entropy'],
+# Cập nhật lưới tham số cho GridSearchCV hoặc RandomizedSearchCV
+param_grids_classifier = {
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500],
+        'model__max_depth': [6, 10, 15],
+        'model__criterion': ['gini', 'entropy'],
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7],
+        'model__weights': ['uniform', 'distance'],
+    },
+    'svm': {
+        'model__C': [0.1, 1, 10],
+        'model__kernel': ['linear', 'rbf'],
+    },
+    'naive_bayes': {
+        # GaussianNB không có tham số để tinh chỉnh
     }
 
-    # Sử dụng GridSearchCV để tìm bộ tham số tốt nhất
-    grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-    grid_search.fit(X_train, y_train)
+}
 
-    # In ra bộ tham số tốt nhất
-    best_params = grid_search.best_params_
-    print("Best Parameters:", best_params)
+regressors = {
+        'random_forest': RandomForestRegressor(random_state=42),
+        'svr': SVR(),
+        'gradient_boosting': GradientBoostingRegressor(random_state=42),
+        'linear_regression': LinearRegression(),
+        'knn': KNeighborsRegressor(),
+    }
 
-    # Dự đoán trên tập kiểm tra
-    y_pred = grid_search.predict(X_val)
+param_grids_regressor = {
+    'random_forest': {
+        'model__n_estimators': [100, 300, 500, 1000],
+        'model__max_depth': [6, 10, 15],
+    },
+    'svr': {
+        'model__kernel': ['poly', 'linear'],
+        'model__C': [0.1, 1, 10],
+        'model__degree': [2, 3],  # For poly kernel
+    },
+    'gradient_boosting': {
+        'model__n_estimators': [100, 300, 500],
+        'model__learning_rate': [0.001, 0.01, 0.05, 0.1, 0.2],  # Extended range
+    },
+    'linear_regression': {
+        # No hyperparameters to tune for LinearRegression
+    },
+    'knn': {
+        'model__n_neighbors': [3, 5, 7, 10 , 20 , 30],
+        'model__weights': ['uniform', 'distance'],
+        'model__p': [1, 2],
+    },
+}
 
-    # Đánh giá kết quả
-    accuracy = accuracy_score(y_val, y_pred)
-    print(f"Accuracy: {round(accuracy, 2)*100} %")
-    return grid_search
+
+########################################################################
+
+def cross_validate(train_data, model_class, param_grid, num_fold=5, metric='neg_mean_squared_error'):
+    X_train, y_train = train_data
+    rkf = RepeatedKFold(n_splits=num_fold, n_repeats=2, random_state=42)
+    best_model = None
+    best_score = -float('inf') if metric != 'accuracy' else 0 
+    best_params = None
+    mse_scores = []
+    r2_scores = []
+    acc_scores = []
+
+    for train_index, valid_index in rkf.split(X_train):
+        # Split into training and validation sets
+        X_train_fold, X_valid_fold = X_train[train_index], X_train[valid_index]
+        y_train_fold, y_valid_fold = y_train[train_index], y_train[valid_index]
+        
+        # Initialize a fresh model for each fold (pipeline + grid search)
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('model', model_class)
+        ])
+        
+        # Perform grid search on the training fold
+        grid_search = GridSearchCV(pipeline, param_grid, cv=3, n_jobs=-1, scoring=metric)
+        grid_search.fit(X_train_fold, y_train_fold)
+        
+        # Make predictions on the validation fold
+        y_pred = grid_search.predict(X_valid_fold)
+
+        if metric == 'accuracy':
+            score = accuracy_score(y_valid_fold, y_pred)
+            acc_scores.append(score)
+            if score > best_score:
+                best_score = score
+                best_model = grid_search.best_estimator_  # Best model for this fold
+                best_params = grid_search.best_params_
+            
+        else:
+            # Calculate both R² and MSE for regression tasks
+            r2 = r2_score(y_valid_fold, y_pred)
+            mse = mean_squared_error(y_valid_fold, y_pred)
+            r2_scores.append(r2)
+            mse_scores.append(mse)
+            if r2 > best_score:
+                best_score = r2
+                best_model = grid_search.best_estimator_
+                best_params = grid_search.best_params_
+
+
+    # Print results
+    if metric == 'accuracy':
+        print(f"Average accuracy: {sum(acc_scores) / len(acc_scores)}")
+        print(f"Best accuracy score: {best_score}")
+    else:
+        # Print both MSE and R² results
+        print(f"Average R²: {sum(r2_scores) / len(r2_scores)}")
+        print(f"Average MSE: {sum(mse_scores) / len(mse_scores)}")
+        print(f"Best R²: {best_score}")
+    
+    # Return the best model and its parameters
+    return best_model, best_params
+
+# Example of using KNN regressor
+
+#############################################################
+def extract_data_point(train, average_ndvi, dsvh, dsvv):
+    loaded_datasets = {}
+    for idx, point in train.iterrows():
+        key = f"point_{idx + 1}"
+        try:
+            ndvi_data = average_ndvi.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+            loaded_datasets[key] = {
+                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
+                "label": point.HT_code
+            }
+        except Exception as e:
+            # Handle the exception if necessary
+            print(f"Error at point {key}: {e}")
+    return loaded_datasets
+#############################################################
+def create_dataset(datasets):
+    data_points = []
+    labels = []
+    for point_key, point_data in datasets.items():
+        data_array = point_data['data']
+        label = point_data['label']
+        for row in data_array:
+            data_points.append(row)
+            labels.append(label)
+    return data_points, labels
+
+
 
 
 def save_model(name_file, grid_search):
@@ -324,9 +486,8 @@ def compare(KD_path, KetQuaPhanLoaiDat, CODE_MAP, HT_MAP):
     return result
 
 
-def save_result(result, HT_MAP):
+def save_result(result, save_path, HT_MAP):
     # cmap = ListedColormap(colors)
-    save_path = "ThuanHoa/KetQua"
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
@@ -340,3 +501,5 @@ def save_result(result, HT_MAP):
         # plt.title(f'{HT_MAP[k]["name"]}')
         # plt.axis('off')
         # plt.show()
+#################################################       
+        
