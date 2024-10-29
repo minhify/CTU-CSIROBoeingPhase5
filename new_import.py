@@ -198,7 +198,7 @@ def extract_data_point(train, average_ndvi, dsvh, dsvv):
             print(f"Error at point {key}: {e}")
     return loaded_datasets
 ###################################################################
-def create_dataset_new(datasets):
+def create_dataset(datasets):
     data_points = []
     labels = []
     for point_key, point_data in datasets.items():
@@ -278,17 +278,17 @@ classifiers = {
 
 param_grids_classifier = {
     'random_forest': {
-        'n_estimators': [100, 300, 500, 700, 1000],
+        'n_estimators': [100, 300, 500, 700],
         'max_depth': [6, 8, 10, 15, 20],
         'criterion': ['gini', 'entropy'],
     },
     'knn': {
-        'n_neighbors': [3, 5, 7],
+        'n_neighbors': [3, 5, 7, 15, 30, 50],
         'weights': ['uniform', 'distance'],
     },
     'svm': {
         'C': [0.1, 1, 10],
-        'kernel': ['linear', 'rbf'],
+        'kernel': ['poly', 'rbf'],
     },
     'naive_bayes': {
         # No hyperparameters to tune for GaussianNB by default
