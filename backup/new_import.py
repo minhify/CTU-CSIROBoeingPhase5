@@ -187,61 +187,61 @@ def load_sen1(name_vh, name_vv):
     return dsvh, dsvv
 
 
-def create_dataset(train, average_ndvi, dsvh, dsvv):
-    loaded_datasets = {}
-    for idx, point in train.iterrows():
-        key = f"point_{idx + 1}"
-        try:
-            ndvi_data = average_ndvi.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
-            vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
-            vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
-            loaded_datasets[key] = {
-                "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
-                "label": point.HT_code
-                                   }
-        except Exception as e:
-            # loaded_datasets[key] = None
-            print(e)
-    return loaded_datasets
+# def create_dataset(train, average_ndvi, dsvh, dsvv):
+#     loaded_datasets = {}
+#     for idx, point in train.iterrows():
+#         key = f"point_{idx + 1}"
+#         try:
+#             ndvi_data = average_ndvi.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+#             vh_data = dsvh.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+#             vv_data = dsvv.sel(x=point.geometry.x, y=point.geometry.y, method='nearest').values
+#             loaded_datasets[key] = {
+#                 "data": np.stack((ndvi_data, vh_data, vv_data), axis=1),
+#                 "label": point.HT_code
+#                                    }
+#         except Exception as e:
+#             # loaded_datasets[key] = None
+#             print(e)
+#     return loaded_datasets
 
 
-def split_train_data(train, label_mapping, datasets):
-    label_encoder = LabelEncoder()
-    # Fit and transform the labels
-    labels = train.Hientrang.values
-    try:
-        numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
-    except KeyError as e:
-        print(f"Label {e} not found in label_mapping.")
-        return None
-    X = []
-    x_new = []
-    lb_new = []
-    # Lấy dữ liệu từ datasets
-    for k, v in datasets.items():
-        X.append(v)
+# def split_train_data(train, label_mapping, datasets):
+#     label_encoder = LabelEncoder()
+#     # Fit and transform the labels
+#     labels = train.Hientrang.values
+#     try:
+#         numeric_labels = label_encoder.fit_transform([label_mapping[label] for label in labels])
+#     except KeyError as e:
+#         print(f"Label {e} not found in label_mapping.")
+#         return None
+#     X = []
+#     x_new = []
+#     lb_new = []
+#     # Lấy dữ liệu từ datasets
+#     for k, v in datasets.items():
+#         X.append(v)
     
-    # Lọc dữ liệu không None và tạo các danh sách x_new và lb_new
-    for i in range(len(X)):
-        if X[i] is not None:
-            x_new.append(X[i]["data"])
-            lb_new.append(numeric_labels[i])
-    # Kiểm tra kích thước
-    print(f"data length: {len(x_new)}, label length: {len(lb_new)}")
-    # Kiểm tra xem x_new và lb_new có dữ liệu hay không
-    if len(x_new) == 0 or len(lb_new) == 0:
-        print("Error: No valid data found.")
-        return None
-    # Chuyển đổi thành NumPy arrays
-    x_new = np.array(x_new)
-    lb_new = np.array(lb_new)
-    np.savez('land_use_dataset.npz', data=x_new, label=lb_new)
-    print("SAve dataset")
-    # Chia dữ liệu
-    X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
-    # In kích thước dữ liệu sau khi chia
-    print(f"X_train length: {len(X_train)}, y_train length: {len(y_train)}")
-    return X_train, X_test, y_train, y_test
+#     # Lọc dữ liệu không None và tạo các danh sách x_new và lb_new
+#     for i in range(len(X)):
+#         if X[i] is not None:
+#             x_new.append(X[i]["data"])
+#             lb_new.append(numeric_labels[i])
+#     # Kiểm tra kích thước
+#     print(f"data length: {len(x_new)}, label length: {len(lb_new)}")
+#     # Kiểm tra xem x_new và lb_new có dữ liệu hay không
+#     if len(x_new) == 0 or len(lb_new) == 0:
+#         print("Error: No valid data found.")
+#         return None
+#     # Chuyển đổi thành NumPy arrays
+#     x_new = np.array(x_new)
+#     lb_new = np.array(lb_new)
+#     np.savez('land_use_dataset.npz', data=x_new, label=lb_new)
+#     print("SAve dataset")
+#     # Chia dữ liệu
+#     X_train, X_test, y_train, y_test = train_test_split(x_new, lb_new, test_size=0.2, random_state=42)
+#     # In kích thước dữ liệu sau khi chia
+#     print(f"X_train length: {len(X_train)}, y_train length: {len(y_train)}")
+#     return X_train, X_test, y_train, y_test
 
 
 classifiers = {
