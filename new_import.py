@@ -78,7 +78,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, make_scorer, mean_absolute_error
 import joblib
 
 
@@ -256,18 +256,34 @@ param_grids_regressor = {
 }
 
 
-def find_best_regression(x_train, y_train, model, param_grid, cv=5, scoring='neg_mean_squared_error'):
-    # Initialize GridSearchCV with the model, parameter grid, and cross-validation settings
-    grid_search = GridSearchCV(model, param_grid, cv=cv, scoring=scoring, n_jobs=-1, return_train_score=True)
+
+def find_best_regression(x_train, y_train, model, param_grid, cv=5):
+    # Define custom scoring metrics
+    scoring = {
+        'MAE': make_scorer(mean_absolute_error, greater_is_better=False),
+        'R2': make_scorer(r2_score)
+    }
+    
+    # Initialize GridSearchCV with the model, parameter grid, cross-validation settings, and multiple scoring metrics
+    grid_search = GridSearchCV(model, param_grid, cv=cv, scoring=scoring, n_jobs=-1, refit='R2', return_train_score=True)
+    
     # Fit the grid search to the training data
     grid_search.fit(x_train, y_train)
-    # Get the best model, parameters, score, and full CV results
+    
+    # Get the best model, parameters, R² score, and MAE score
     best_model = grid_search.best_estimator_
     best_params = grid_search.best_params_
-    best_score = grid_search.best_score_
+    best_score_r2 = grid_search.cv_results_['mean_test_R2'][grid_search.best_index_]
+    best_score_mae = grid_search.cv_results_['mean_test_MAE'][grid_search.best_index_]
     cv_results = grid_search.cv_results_  # Includes performance metrics for each parameter combination
+
+    # Print the best parameters and scores
+    print("Best Parameters:", best_params)
+    print("Best R² Score:", best_score_r2)
+    print("Best MAE Score:", best_score_mae)
     
-    return best_model, best_params, best_score, cv_results
+    return best_model, best_params, best_score_r2, best_score_mae, cv_results
+
 #############################################################################
 classifiers = {
         'random_forest': RandomForestClassifier(random_state=42, n_jobs=-1),
